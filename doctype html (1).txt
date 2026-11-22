@@ -1,0 +1,1296 @@
+<!DOCTYPE html>
+<html lang="id">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Dashboard Data Store Jakarta Sel-Timur | Kawan Lama Group</title>
+  <!-- Tailwind CSS -->
+  <script src="https://cdn.tailwindcss.com"></script>
+  <!-- Chart.js -->
+  <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+  <!-- PapaParse untuk Import/Export CSV akurat -->
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/PapaParse/5.4.1/papaparse.min.js"></script>
+  <!-- Lucide Icons -->
+  <script src="https://unpkg.com/lucide@latest"></script>
+  <style>
+    @import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap');
+    body { font-family: 'Inter', sans-serif; background-color: #f1f5f9; color: #0f172a; }
+    .custom-scrollbar::-webkit-scrollbar { width: 6px; height: 6px; }
+    .custom-scrollbar::-webkit-scrollbar-track { background: #f1f5f9; }
+    .custom-scrollbar::-webkit-scrollbar-thumb { background: #cbd5e1; border-radius: 3px; }
+    .custom-scrollbar::-webkit-scrollbar-thumb:hover { background: #94a3b8; }
+    .tab-btn.active { border-bottom: 2px solid #0284c7; color: #0284c7; font-weight: 600; background-color: #f0f9ff; }
+  </style>
+</head>
+<body class="min-h-screen flex flex-col">
+
+  <!-- TOP NAVBAR -->
+  <header class="bg-slate-900 text-white shadow-lg sticky top-0 z-30">
+    <div class="max-w-[1600px] mx-auto px-4 sm:px-6 py-3 flex flex-wrap items-center justify-between gap-3">
+      <div class="flex items-center gap-3">
+        <div class="bg-sky-500 p-2 rounded-lg">
+          <i data-lucide="store" class="w-6 h-6 text-white"></i>
+        </div>
+        <div>
+          <h1 class="text-lg font-bold tracking-tight leading-tight">STORE MASTER & LOSS PREVENTION DASHBOARD</h1>
+          <p class="text-xs text-slate-400">Region Jakarta Selatan & Jakarta Timur — Kawan Lama Group (81 Atribut Data)</p>
+        </div>
+      </div>
+
+      <!-- ACTION & SYNC CONTROLS -->
+      <div class="flex flex-wrap items-center gap-2">
+        <div id="syncStatusBadge" class="flex items-center gap-1.5 px-3 py-1.5 rounded-full text-xs font-medium bg-slate-800 text-slate-300 border border-slate-700">
+          <span id="syncDot" class="w-2 h-2 rounded-full bg-amber-400"></span>
+          <span id="syncText">Mode Lokal (Belum Terhubung GAS)</span>
+        </div>
+
+        <button onclick="openGasModal()" class="flex items-center gap-1.5 px-3 py-1.5 bg-slate-800 hover:bg-slate-700 text-sky-400 border border-slate-700 rounded-lg text-xs font-medium transition">
+          <i data-lucide="cloud-cog" class="w-4 h-4"></i> Konfigurasi GAS
+        </button>
+
+        <button onclick="pullFromGoogleSheet()" class="flex items-center gap-1.5 px-3 py-1.5 bg-emerald-600 hover:bg-emerald-500 text-white rounded-lg text-xs font-medium transition shadow-sm">
+          <i data-lucide="refresh-cw" class="w-4 h-4"></i> Pull Sheet
+        </button>
+
+        <button onclick="pushAllToGoogleSheet()" class="flex items-center gap-1.5 px-3 py-1.5 bg-indigo-600 hover:bg-indigo-500 text-white rounded-lg text-xs font-medium transition shadow-sm">
+          <i data-lucide="upload-cloud" class="w-4 h-4"></i> Push All
+        </button>
+
+        <label class="flex items-center gap-1.5 px-3 py-1.5 bg-slate-700 hover:bg-slate-600 text-white rounded-lg text-xs font-medium cursor-pointer transition">
+          <i data-lucide="file-up" class="w-4 h-4"></i> Import CSV
+          <input type="file" id="csvFileInput" accept=".csv" class="hidden" onchange="handleCsvUpload(event)" />
+        </label>
+
+        <button onclick="exportToCsv()" class="flex items-center gap-1.5 px-3 py-1.5 bg-slate-700 hover:bg-slate-600 text-white rounded-lg text-xs font-medium transition">
+          <i data-lucide="download" class="w-4 h-4"></i> Export CSV
+        </button>
+
+        <button onclick="openFormModal('create')" class="flex items-center gap-1.5 px-3.5 py-1.5 bg-sky-500 hover:bg-sky-400 text-slate-950 font-semibold rounded-lg text-xs transition shadow">
+          <i data-lucide="plus-circle" class="w-4 h-4"></i> Tambah Store
+        </button>
+      </div>
+    </div>
+  </header>
+
+  <!-- MAIN CONTENT -->
+  <main class="flex-1 max-w-[1600px] w-full mx-auto px-4 sm:px-6 py-5 space-y-5">
+
+    <!-- KPI SUMMARY CARDS -->
+    <section class="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-6 gap-3">
+      <div class="bg-white p-4 rounded-xl border border-slate-200 shadow-sm">
+        <div class="flex items-center justify-between text-slate-500 text-xs font-medium">
+          <span>TOTAL STORE</span>
+          <i data-lucide="building-2" class="w-4 h-4 text-sky-600"></i>
+        </div>
+        <div id="kpiTotalStore" class="text-2xl font-bold text-slate-800 mt-1">0</div>
+        <div id="kpiAreaSub" class="text-[11px] text-slate-500 mt-0.5">Jaksel: 0 | Jaktim: 0</div>
+      </div>
+
+      <div class="bg-white p-4 rounded-xl border border-slate-200 shadow-sm">
+        <div class="flex items-center justify-between text-slate-500 text-xs font-medium">
+          <span>TOTAL LUAS AREA</span>
+          <i data-lucide="maximize-2" class="w-4 h-4 text-indigo-600"></i>
+        </div>
+        <div id="kpiTotalArea" class="text-2xl font-bold text-slate-800 mt-1">0 m²</div>
+        <div id="kpiAvgArea" class="text-[11px] text-slate-500 mt-0.5">Rata-rata: 0 m²</div>
+      </div>
+
+      <div class="bg-white p-4 rounded-xl border border-slate-200 shadow-sm">
+        <div class="flex items-center justify-between text-slate-500 text-xs font-medium">
+          <span>PERSONEL MPP</span>
+          <i data-lucide="shield-check" class="w-4 h-4 text-emerald-600"></i>
+        </div>
+        <div id="kpiTotalMpp" class="text-2xl font-bold text-slate-800 mt-1">0</div>
+        <div id="kpiStoreWithMpp" class="text-[11px] text-slate-500 mt-0.5">Store dengan MPP: 0</div>
+      </div>
+
+      <div class="bg-white p-4 rounded-xl border border-slate-200 shadow-sm">
+        <div class="flex items-center justify-between text-slate-500 text-xs font-medium">
+          <span>TOTAL CAMERA CCTV</span>
+          <i data-lucide="video" class="w-4 h-4 text-purple-600"></i>
+        </div>
+        <div id="kpiTotalCam" class="text-2xl font-bold text-slate-800 mt-1">0</div>
+        <div id="kpiTotalDvr" class="text-[11px] text-slate-500 mt-0.5">Total DVR/NVR: 0</div>
+      </div>
+
+      <div class="bg-white p-4 rounded-xl border border-slate-200 shadow-sm">
+        <div class="flex items-center justify-between text-slate-500 text-xs font-medium">
+          <span>UNIT APAR</span>
+          <i data-lucide="flame" class="w-4 h-4 text-orange-600"></i>
+        </div>
+        <div id="kpiTotalApar" class="text-2xl font-bold text-slate-800 mt-1">0</div>
+        <div id="kpiAparSub" class="text-[11px] text-slate-500 mt-0.5">Terpasang: 0 | Backup: 0</div>
+      </div>
+
+      <div class="bg-white p-4 rounded-xl border border-slate-200 shadow-sm">
+        <div class="flex items-center justify-between text-slate-500 text-xs font-medium">
+          <span>ALERT APAR EXPIRED</span>
+          <i data-lucide="alert-triangle" class="w-4 h-4 text-rose-600"></i>
+        </div>
+        <div id="kpiAparExpired" class="text-2xl font-bold text-rose-600 mt-1">0</div>
+        <div id="kpiAparSoon" class="text-[11px] text-amber-600 mt-0.5">Segera Expired (&lt;90 hr): 0</div>
+      </div>
+    </section>
+
+    <!-- CHARTS SECTION -->
+    <section class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
+      <div class="bg-white p-4 rounded-xl border border-slate-200 shadow-sm">
+        <h3 class="text-xs font-semibold text-slate-600 uppercase tracking-wider mb-2">Distribusi Store per Brand</h3>
+        <div class="h-52"><canvas id="chartBrand"></canvas></div>
+      </div>
+
+      <div class="bg-white p-4 rounded-xl border border-slate-200 shadow-sm">
+        <h3 class="text-xs font-semibold text-slate-600 uppercase tracking-wider mb-2">Wilayah & Kategori Lokasi</h3>
+        <div class="h-52"><canvas id="chartRegion"></canvas></div>
+      </div>
+
+      <div class="bg-white p-4 rounded-xl border border-slate-200 shadow-sm">
+        <h3 class="text-xs font-semibold text-slate-600 uppercase tracking-wider mb-2">Store per Business Unit</h3>
+        <div class="h-52"><canvas id="chartBU"></canvas></div>
+      </div>
+
+      <div class="bg-white p-4 rounded-xl border border-slate-200 shadow-sm">
+        <h3 class="text-xs font-semibold text-slate-600 uppercase tracking-wider mb-2">Status Kepatuhan APAR (K3)</h3>
+        <div class="h-52"><canvas id="chartApar"></canvas></div>
+      </div>
+    </section>
+
+    <!-- FILTER PANEL -->
+    <section class="bg-white p-4 rounded-xl border border-slate-200 shadow-sm space-y-3">
+      <div class="flex flex-wrap items-center justify-between gap-2">
+        <div class="flex items-center gap-2 text-sm font-semibold text-slate-700">
+          <i data-lucide="filter" class="w-4 h-4 text-sky-600"></i>
+          <span>Filter & Pencarian Lanjutan</span>
+        </div>
+        <button onclick="resetFilters()" class="text-xs text-sky-600 hover:text-sky-800 font-medium flex items-center gap-1">
+          <i data-lucide="rotate-ccw" class="w-3.5 h-3.5"></i> Reset Semua Filter
+        </button>
+      </div>
+
+      <div class="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-4 lg:grid-cols-7 gap-2.5">
+        <div class="lg:col-span-2 relative">
+          <i data-lucide="search" class="w-4 h-4 text-slate-400 absolute left-3 top-2.5"></i>
+          <input type="text" id="filterSearch" oninput="applyFilters()" placeholder="Cari Kode Store, Nama Store, Site, SM, LP SPV..."
+            class="w-full pl-9 pr-3 py-1.5 text-xs border border-slate-300 rounded-lg focus:ring-2 focus:ring-sky-500 focus:border-sky-500 outline-none" />
+        </div>
+
+        <select id="filterBU" onchange="applyFilters()" class="text-xs border border-slate-300 rounded-lg px-2.5 py-1.5 bg-white focus:ring-2 focus:ring-sky-500 outline-none">
+          <option value="">Semua Business Unit</option>
+        </select>
+
+        <select id="filterBrand" onchange="applyFilters()" class="text-xs border border-slate-300 rounded-lg px-2.5 py-1.5 bg-white focus:ring-2 focus:ring-sky-500 outline-none">
+          <option value="">Semua Brand</option>
+        </select>
+
+        <select id="filterKota" onchange="applyFilters()" class="text-xs border border-slate-300 rounded-lg px-2.5 py-1.5 bg-white focus:ring-2 focus:ring-sky-500 outline-none">
+          <option value="">Semua Kabupaten/Kota</option>
+        </select>
+
+        <select id="filterSubCat" onchange="applyFilters()" class="text-xs border border-slate-300 rounded-lg px-2.5 py-1.5 bg-white focus:ring-2 focus:ring-sky-500 outline-none">
+          <option value="">Semua Sub Category</option>
+        </select>
+
+        <select id="filterAparStatus" onchange="applyFilters()" class="text-xs border border-slate-300 rounded-lg px-2.5 py-1.5 bg-white focus:ring-2 focus:ring-sky-500 outline-none">
+          <option value="">Semua Status APAR</option>
+          <option value="EXPIRED">APAR Expired</option>
+          <option value="SOON">Segera Expired (&lt;90 Hari)</option>
+          <option value="VALID">APAR Valid</option>
+          <option value="EMPTY">Data APAR Kosong</option>
+        </select>
+      </div>
+    </section>
+
+    <!-- DATA TABLE SECTION -->
+    <section class="bg-white rounded-xl border border-slate-200 shadow-sm overflow-hidden">
+      <div class="px-4 py-3 border-b border-slate-200 flex flex-wrap items-center justify-between gap-2 bg-slate-50">
+        <div class="text-xs text-slate-600">
+          Menampilkan <span id="showingCount" class="font-bold text-slate-900">0</span> dari <span id="totalCount" class="font-bold text-slate-900">0</span> Store
+        </div>
+        <div class="flex items-center gap-2 text-xs">
+          <label class="text-slate-600">Baris per halaman:</label>
+          <select id="pageSizeSelect" onchange="changePageSize()" class="border border-slate-300 rounded px-2 py-1 bg-white">
+            <option value="15">15</option>
+            <option value="30">30</option>
+            <option value="50">50</option>
+            <option value="106">Semua</option>
+          </select>
+        </div>
+      </div>
+
+      <div class="overflow-x-auto custom-scrollbar">
+        <table class="w-full text-left border-collapse">
+          <thead>
+            <tr class="bg-slate-800 text-slate-200 text-[11px] uppercase tracking-wider">
+              <th class="py-2.5 px-3 font-semibold">Kode</th>
+              <th class="py-2.5 px-3 font-semibold">Brand</th>
+              <th class="py-2.5 px-3 font-semibold">Brand + Location Name</th>
+              <th class="py-2.5 px-3 font-semibold">Wilayah & Lokasi</th>
+              <th class="py-2.5 px-3 font-semibold text-right">Area (m²)</th>
+              <th class="py-2.5 px-3 font-semibold">LP ARH / LP SPV</th>
+              <th class="py-2.5 px-3 font-semibold text-center">MPP</th>
+              <th class="py-2.5 px-3 font-semibold text-center">CCTV</th>
+              <th class="py-2.5 px-3 font-semibold">Exp. APAR</th>
+              <th class="py-2.5 px-3 font-semibold text-center">Status</th>
+              <th class="py-2.5 px-3 font-semibold text-center sticky right-0 bg-slate-800">Aksi</th>
+            </tr>
+          </thead>
+          <tbody id="storeTableBody" class="divide-y divide-slate-200 text-xs">
+            <!-- Diisi dinamis oleh JS -->
+          </tbody>
+        </table>
+      </div>
+
+      <!-- PAGINATION -->
+      <div class="px-4 py-3 border-t border-slate-200 flex items-center justify-between bg-slate-50 text-xs">
+        <div id="pageInfo" class="text-slate-600">Halaman 1 dari 1</div>
+        <div class="flex items-center gap-1.5">
+          <button onclick="prevPage()" id="btnPrev" class="px-3 py-1 rounded border border-slate-300 bg-white hover:bg-slate-100 disabled:opacity-40">Sebelumnya</button>
+          <button onclick="nextPage()" id="btnNext" class="px-3 py-1 rounded border border-slate-300 bg-white hover:bg-slate-100 disabled:opacity-40">Berikutnya</button>
+        </div>
+      </div>
+    </section>
+  </main>
+
+  <!-- MODAL 1: DETAIL STORE (81 KOLOM LENGKAP) -->
+  <div id="detailModal" class="fixed inset-0 bg-slate-900/60 backdrop-blur-xs hidden items-center justify-center z-50 p-4">
+    <div class="bg-white rounded-2xl max-w-5xl w-full max-h-[90vh] flex flex-col shadow-2xl overflow-hidden">
+      <div class="px-6 py-4 bg-slate-900 text-white flex items-center justify-between">
+        <div>
+          <div class="flex items-center gap-2">
+            <span id="detKodeBadge" class="px-2 py-0.5 bg-sky-500 text-slate-950 font-bold text-xs rounded">A310</span>
+            <h2 id="detTitle" class="text-base font-bold">DETAIL STORE</h2>
+          </div>
+          <p id="detSubtitle" class="text-xs text-slate-400 mt-0.5">Business Unit & Site Location</p>
+        </div>
+        <div class="flex items-center gap-2">
+          <a id="detMapLink" href="#" target="_blank" class="px-3 py-1.5 bg-emerald-600 hover:bg-emerald-500 text-white rounded-lg text-xs font-medium flex items-center gap-1">
+            <i data-lucide="map-pin" class="w-3.5 h-3.5"></i> Google Maps
+          </a>
+          <button onclick="closeModal('detailModal')" class="p-1.5 hover:bg-slate-800 rounded-lg text-slate-400 hover:text-white">
+            <i data-lucide="x" class="w-5 h-5"></i>
+          </button>
+        </div>
+      </div>
+
+      <div id="detailContent" class="p-6 overflow-y-auto custom-scrollbar space-y-6 text-xs">
+        <!-- Diisi dinamis -->
+      </div>
+
+      <div class="px-6 py-3 bg-slate-50 border-t border-slate-200 flex justify-end gap-2">
+        <button id="detEditBtn" class="px-4 py-2 bg-amber-500 hover:bg-amber-400 text-slate-950 font-semibold rounded-lg text-xs flex items-center gap-1.5">
+          <i data-lucide="edit-3" class="w-4 h-4"></i> Edit Data Store Ini
+        </button>
+        <button onclick="closeModal('detailModal')" class="px-4 py-2 bg-slate-200 hover:bg-slate-300 text-slate-800 font-medium rounded-lg text-xs">Tutup</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- MODAL 2: FORM TAMBAH / EDIT STORE (81 KOLOM TERSTRUKTUR DALAM 5 TAB) -->
+  <div id="formModal" class="fixed inset-0 bg-slate-900/60 backdrop-blur-xs hidden items-center justify-center z-50 p-4">
+    <div class="bg-white rounded-2xl max-w-5xl w-full max-h-[92vh] flex flex-col shadow-2xl overflow-hidden">
+      <div class="px-6 py-4 bg-slate-900 text-white flex items-center justify-between">
+        <div>
+          <h2 id="formModalTitle" class="text-base font-bold">Tambah Data Store Baru</h2>
+          <p class="text-xs text-slate-400">Lengkapi seluruh 81 atribut store. Perubahan otomatis tersimpan & disinkronkan ke Google Sheet jika terhubung.</p>
+        </div>
+        <button onclick="closeModal('formModal')" class="p-1.5 hover:bg-slate-800 rounded-lg text-slate-400 hover:text-white">
+          <i data-lucide="x" class="w-5 h-5"></i>
+        </button>
+      </div>
+
+      <!-- TAB NAVIGASI FORM -->
+      <div class="flex border-b border-slate-200 bg-slate-50 px-4 overflow-x-auto text-xs">
+        <button type="button" onclick="switchFormTab(0)" class="tab-btn active px-4 py-3 whitespace-nowrap">1. Identitas & Lokasi (16)</button>
+        <button type="button" onclick="switchFormTab(1)" class="tab-btn px-4 py-3 whitespace-nowrap">2. Manajemen & LP (11)</button>
+        <button type="button" onclick="switchFormTab(2)" class="tab-btn px-4 py-3 whitespace-nowrap">3. Tanggal & Status (11)</button>
+        <button type="button" onclick="switchFormTab(3)" class="tab-btn px-4 py-3 whitespace-nowrap">4. Gedung, CCTV & Alarm (22)</button>
+        <button type="button" onclick="switchFormTab(4)" class="tab-btn px-4 py-3 whitespace-nowrap">5. EAS, HT & APAR/K3 (21)</button>
+      </div>
+
+      <form id="storeForm" onsubmit="handleFormSubmit(event)" class="flex-1 overflow-y-auto p-6 custom-scrollbar text-xs">
+        <input type="hidden" id="formMode" value="create" />
+        <input type="hidden" id="originalKodeStore" value="" />
+        <div id="formTabsContainer">
+          <!-- Diisi dinamis oleh JS untuk ke-81 kolom -->
+        </div>
+      </form>
+
+      <div class="px-6 py-3.5 bg-slate-50 border-t border-slate-200 flex items-center justify-between">
+        <span class="text-[11px] text-slate-500">* Kolom <strong>KODE STORE</strong> wajib diisi dan unik.</span>
+        <div class="flex items-center gap-2">
+          <button type="button" onclick="closeModal('formModal')" class="px-4 py-2 bg-slate-200 hover:bg-slate-300 text-slate-800 rounded-lg text-xs font-medium">Batal</button>
+          <button type="submit" form="storeForm" class="px-5 py-2 bg-sky-600 hover:bg-sky-500 text-white rounded-lg text-xs font-semibold shadow flex items-center gap-1.5">
+            <i data-lucide="save" class="w-4 h-4"></i> Simpan Data
+          </button>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- MODAL 3: KONFIGURASI GOOGLE APPS SCRIPT -->
+  <div id="gasModal" class="fixed inset-0 bg-slate-900/60 backdrop-blur-xs hidden items-center justify-center z-50 p-4">
+    <div class="bg-white rounded-2xl max-w-lg w-full shadow-2xl overflow-hidden">
+      <div class="px-6 py-4 bg-slate-900 text-white flex items-center justify-between">
+        <h3 class="text-sm font-bold flex items-center gap-2">
+          <i data-lucide="cloud-cog" class="w-4 h-4 text-sky-400"></i> Konfigurasi Integrasi Google Spreadsheet
+        </h3>
+        <button onclick="closeModal('gasModal')" class="text-slate-400 hover:text-white"><i data-lucide="x" class="w-5 h-5"></i></button>
+      </div>
+      <div class="p-6 space-y-4 text-xs">
+        <p class="text-slate-600 leading-relaxed">
+          Tempelkan <strong>Web App URL</strong> hasil deploy Google Apps Script dari Spreadsheet Anda agar setiap operasi Tambah, Edit, Hapus, dan Pull/Push tersinkronisasi 2 arah secara otomatis.
+        </p>
+        <div>
+          <label class="block font-semibold text-slate-700 mb-1">Google Apps Script Web App URL</label>
+          <input type="url" id="gasUrlInput" placeholder="https://script.google.com/macros/s/AKfycb.../exec"
+            class="w-full px-3 py-2 border border-slate-300 rounded-lg focus:ring-2 focus:ring-sky-500 outline-none" />
+        </div>
+        <div class="flex items-center gap-2">
+          <input type="checkbox" id="autoSyncCheckbox" checked class="rounded text-sky-600" />
+          <label for="autoSyncCheckbox" class="text-slate-700">Otomatis kirim perubahan CRUD ke Google Sheet saat menyimpan/menghapus</label>
+        </div>
+      </div>
+      <div class="px-6 py-3 bg-slate-50 border-t border-slate-200 flex justify-end gap-2">
+        <button onclick="saveGasConfig()" class="px-4 py-2 bg-sky-600 hover:bg-sky-500 text-white font-semibold rounded-lg text-xs">Simpan & Hubungkan</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- TOAST NOTIFICATION -->
+  <div id="toast" class="fixed bottom-5 right-5 z-50 hidden items-center gap-2.5 px-4 py-3 rounded-xl shadow-lg text-xs font-medium text-white bg-slate-900 border border-slate-700 transition-all">
+    <span id="toastIcon"></span>
+    <span id="toastMessage">Notifikasi</span>
+  </div>
+
+<script>
+// ============================================================================
+// 1. DEFINISI 81 KOLOM SESUAI STRUKTUR CSV KAWAN LAMA GROUP
+// ============================================================================
+const COLUMN_GROUPS = [
+  {
+    title: "Identitas & Lokasi Store",
+    cols: [
+      "KODE STORE", "BUSINESS UNIT", "BRAND+LOCATION NAME", "COST CENTER GROUP NAME",
+      "LOCATION NAME", "SITE NAME", "LINK GOOGLE MAP", "BRAND", "TYPE", "CATEGORY",
+      "SUB CATEGORY", "INDUSTRY", "AREA (m²)", "KABUPATEN / KOTA", "PROVINSI", "PULAU"
+    ]
+  },
+  {
+    title: "Struktur Manajemen & Loss Prevention (LP)",
+    cols: [
+      "NIP LP REGIONAL", "LP REGIONAL", "NIP LP ARH", "LP ARH", "NIP LP SPV",
+      "LP SPV", "PHONE (LP SPV)", "REGIONAL MANAGER", "AREA MANAGER", "STORE MANAGER", "PHONE (SM)"
+    ]
+  },
+  {
+    title: "Tanggal Buka, Relayout, Relokasi & Status",
+    cols: [
+      "OPEN DATE", "MONTH", "YEAR", "PERIODE", "RELAYOUT", "MONTH RELAY",
+      "YEAR RELAY", "RELOKASI", "MONTH RELOK", "YEAR RELOK", "STATUS"
+    ]
+  },
+  {
+    title: "Akses Gedung, MPP, CCTV & Sistem Alarm",
+    cols: [
+      "PINTU CUST", "PINTU KARY", "LIFT CUST", "LIFT BARANG", "LOADING DOCK", "ESKALATOR",
+      "MPP", "JUMLAH MPP", "DVR HARDDISK", "TIPE VIDEO RECORDING", "MERK DVR HARDDISK",
+      "CAMERA", "TIPE CAMERA", "MERK CAMERA", "HARDDISK", "TV MONITOR (PUBLIC)",
+      "TV MONITOR (MONITOR)", "COMPUTER", "PANEL ALARM", "BATTERY", "KEYPAD ALARM", "TIPE GSM / LINE TELP"
+    ]
+  },
+  {
+    title: "EAS, Komunikasi HT, APAR & K3",
+    cols: [
+      "TIANG PEDESTAL", "LABEL DIACTIVATER", "MAGNETIC DETACHER", "HAND HELD VERIFIER",
+      "HT", "TIPE HT", "EAR SET", "HAND HELD METAL DETECTOR", "FLASH LIGHT", "ERT BOARD",
+      "E TAG", "APAR", "APAR TERPASANG", "APAR BACKUP", "EXPIRED APAR", "UKURAN APAR",
+      "MERK APAR", "TIPE APAR", "KOTAK P3K", "TIPE AKSES KONTROL", "KETERANGAN"
+    ]
+  }
+];
+
+const ALL_COLUMNS = COLUMN_GROUPS.flatMap(g => g.cols);
+
+// ============================================================================
+// 2. SAMPLE SEED DATA AWAL (DAPAT DITIMPA VIA IMPORT CSV ATAU PULL GOOGLE SHEET)
+// ============================================================================
+const INITIAL_SEED_DATA = [
+  {
+    "KODE STORE": "A310", "BUSINESS UNIT": "PT. Aspirasi Hidup Indonesia, Tbk", "BRAND+LOCATION NAME": "AZKO PANGLIMA POLIM",
+    "COST CENTER GROUP NAME": "AHI-PANGLIMA POLIM", "LOCATION NAME": "PANGLIMA POLIM", "SITE NAME": "PANGLIMA POLIM RAYA JAKARTA SELATAN",
+    "LINK GOOGLE MAP": "https://maps.app.goo.gl/n8UDGw49D5zfE8yv6", "BRAND": "AZKO", "TYPE": "AHI - STORE", "CATEGORY": "RETAIL",
+    "SUB CATEGORY": "STAND ALONE", "INDUSTRY": "CONSUMER RETAIL", "AREA (m²)": "1299", "KABUPATEN / KOTA": "KOTA JAKARTA SELATAN",
+    "PROVINSI": "DKI JAKARTA", "PULAU": "JAWA", "NIP LP REGIONAL": "107803", "LP REGIONAL": "REDA RAMASTERA", "NIP LP ARH": "99569",
+    "LP ARH": "GUNTORO", "NIP LP SPV": "113713", "LP SPV": "DADANG SUMARNA", "PHONE (LP SPV)": "6281281741308",
+    "REGIONAL MANAGER": "", "AREA MANAGER": "", "STORE MANAGER": "", "PHONE (SM)": "",
+    "OPEN DATE": "2000-09-08", "MONTH": "Sep", "YEAR": "2000", "PERIODE": "25", "RELAYOUT": "", "MONTH RELAY": "", "YEAR RELAY": "",
+    "RELOKASI": "", "MONTH RELOK": "", "YEAR RELOK": "", "STATUS": "ACTIVE", "PINTU CUST": "1", "PINTU KARY": "1",
+    "LIFT CUST": "0", "LIFT BARANG": "0", "LOADING DOCK": "1", "ESKALATOR": "0", "MPP": "ADA", "JUMLAH MPP": "2",
+    "DVR HARDDISK": "3", "TIPE VIDEO RECORDING": "DVR", "MERK DVR HARDDISK": "DAHUA", "CAMERA": "48", "TIPE CAMERA": "ANALOG",
+    "MERK CAMERA": "HIKVISION", "HARDDISK": "3", "TV MONITOR (PUBLIC)": "1", "TV MONITOR (MONITOR)": "3", "COMPUTER": "0",
+    "PANEL ALARM": "1", "BATTERY": "1", "KEYPAD ALARM": "1", "TIPE GSM / LINE TELP": "LINE TELP", "TIANG PEDESTAL": "2",
+    "LABEL DIACTIVATER": "2", "MAGNETIC DETACHER": "2", "HAND HELD VERIFIER": "0", "HT": "8", "TIPE HT": "HYT TC 508 VHF",
+    "EAR SET": "3", "HAND HELD METAL DETECTOR": "1", "FLASH LIGHT": "0", "ERT BOARD": "1", "E TAG": "1000", "APAR": "8",
+    "APAR TERPASANG": "8", "APAR BACKUP": "0", "EXPIRED APAR": "2026-04-10", "UKURAN APAR": "4,5 KG", "MERK APAR": "KIDDE",
+    "TIPE APAR": "Dry Chemical (Powder ABC)", "KOTAK P3K": "1", "TIPE AKSES KONTROL": "TIDAK ADA",
+    "KETERANGAN": "Pedestal sedang dalam perbaikan dan info terakhir akan diganti dengan yang baru."
+  },
+  {
+    "KODE STORE": "A313", "BUSINESS UNIT": "PT. Aspirasi Hidup Indonesia, Tbk", "BRAND+LOCATION NAME": "AZKO PONDOK INDAH (AHI)",
+    "COST CENTER GROUP NAME": "AHI-PONDOK INDAH (ACE)", "LOCATION NAME": "PONDOK INDAH (AHI)", "SITE NAME": "PONDOK INDAH MALL 1",
+    "LINK GOOGLE MAP": "https://maps.app.goo.gl/CCgDjprFVWaLZswD8", "BRAND": "AZKO", "TYPE": "AHI - STORE", "CATEGORY": "RETAIL",
+    "SUB CATEGORY": "INSIDE MALL", "INDUSTRY": "CONSUMER RETAIL", "AREA (m²)": "2077", "KABUPATEN / KOTA": "KOTA JAKARTA SELATAN",
+    "PROVINSI": "DKI JAKARTA", "PULAU": "JAWA", "NIP LP REGIONAL": "107803", "LP REGIONAL": "REDA RAMASTERA", "NIP LP ARH": "99569",
+    "LP ARH": "GUNTORO", "NIP LP SPV": "101536", "LP SPV": "HARTONO", "PHONE (LP SPV)": "6281908838883",
+    "REGIONAL MANAGER": "ALI YUDHANTO", "AREA MANAGER": "SYAHRIL NINGKI, ST", "STORE MANAGER": "DANI SUBANDI.", "PHONE (SM)": "6281286000000",
+    "OPEN DATE": "2004-09-23", "MONTH": "Sep", "YEAR": "2004", "PERIODE": "21", "RELAYOUT": "2025-10-30", "MONTH RELAY": "Oct", "YEAR RELAY": "2025",
+    "RELOKASI": "", "MONTH RELOK": "", "YEAR RELOK": "", "STATUS": "ACTIVE", "PINTU CUST": "1", "PINTU KARY": "1",
+    "LIFT CUST": "0", "LIFT BARANG": "0", "LOADING DOCK": "0", "ESKALATOR": "0", "MPP": "ADA", "JUMLAH MPP": "3",
+    "DVR HARDDISK": "3", "TIPE VIDEO RECORDING": "DVR", "MERK DVR HARDDISK": "DAHUA", "CAMERA": "49", "TIPE CAMERA": "IP",
+    "MERK CAMERA": "HIKVISION", "HARDDISK": "3", "TV MONITOR (PUBLIC)": "0", "TV MONITOR (MONITOR)": "2", "COMPUTER": "1",
+    "PANEL ALARM": "1", "BATTERY": "2", "KEYPAD ALARM": "1", "TIPE GSM / LINE TELP": "GSM", "TIANG PEDESTAL": "7",
+    "LABEL DIACTIVATER": "5", "MAGNETIC DETACHER": "5", "HAND HELD VERIFIER": "1", "HT": "10", "TIPE HT": "HYT TC 508 VHF",
+    "EAR SET": "0", "HAND HELD METAL DETECTOR": "1", "FLASH LIGHT": "1", "ERT BOARD": "1", "E TAG": "250", "APAR": "10",
+    "APAR TERPASANG": "10", "APAR BACKUP": "0", "EXPIRED APAR": "2027-04-16", "UKURAN APAR": "6 KG", "MERK APAR": "SERVVO",
+    "TIPE APAR": "Dry Chemical (Powder ABC)", "KOTAK P3K": "1", "TIPE AKSES KONTROL": "FACE",
+    "KETERANGAN": "Update NVR 1 pcs bulan April '26"
+  },
+  {
+    "KODE STORE": "A329", "BUSINESS UNIT": "PT. Aspirasi Hidup Indonesia, Tbk", "BRAND+LOCATION NAME": "AZKO RAWAMANGUN",
+    "COST CENTER GROUP NAME": "AHI-RAWAMANGUN", "LOCATION NAME": "RAWAMANGUN", "SITE NAME": "RAWAMANGUN PEMUDA JAKARTA TIMUR",
+    "LINK GOOGLE MAP": "https://maps.app.goo.gl/Q94GzbV1oRq6AbgGA", "BRAND": "AZKO", "TYPE": "AHI - STORE", "CATEGORY": "RETAIL",
+    "SUB CATEGORY": "STAND ALONE", "INDUSTRY": "CONSUMER RETAIL", "AREA (m²)": "2961", "KABUPATEN / KOTA": "KOTA JAKARTA TIMUR",
+    "PROVINSI": "DKI JAKARTA", "PULAU": "JAWA", "NIP LP REGIONAL": "107803", "LP REGIONAL": "REDA RAMASTERA", "NIP LP ARH": "115022",
+    "LP ARH": "GUNTORO", "NIP LP SPV": "117630", "LP SPV": "HERWANSYAH", "PHONE (LP SPV)": "6283873180981",
+    "REGIONAL MANAGER": "AMIR SITUMORANG", "AREA MANAGER": "SIGIT PRABOWO", "STORE MANAGER": "BOYKE NUGROHO", "PHONE (SM)": "6285818000000",
+    "OPEN DATE": "2007-12-12", "MONTH": "Dec", "YEAR": "2007", "PERIODE": "18", "RELAYOUT": "", "MONTH RELAY": "", "YEAR RELAY": "",
+    "RELOKASI": "", "MONTH RELOK": "", "YEAR RELOK": "", "STATUS": "ACTIVE", "PINTU CUST": "1", "PINTU KARY": "1",
+    "LIFT CUST": "0", "LIFT BARANG": "1", "LOADING DOCK": "1", "ESKALATOR": "0", "MPP": "ADA", "JUMLAH MPP": "4",
+    "DVR HARDDISK": "4", "TIPE VIDEO RECORDING": "DVR", "MERK DVR HARDDISK": "DAHUA", "CAMERA": "56", "TIPE CAMERA": "ANALOG",
+    "MERK CAMERA": "KRISVIEW", "HARDDISK": "4", "TV MONITOR (PUBLIC)": "1", "TV MONITOR (MONITOR)": "4", "COMPUTER": "0",
+    "PANEL ALARM": "1", "BATTERY": "1", "KEYPAD ALARM": "1", "TIPE GSM / LINE TELP": "LINE TELP", "TIANG PEDESTAL": "2",
+    "LABEL DIACTIVATER": "0", "MAGNETIC DETACHER": "4", "HAND HELD VERIFIER": "1", "HT": "15", "TIPE HT": "HYT TC 508 VHF",
+    "EAR SET": "7", "HAND HELD METAL DETECTOR": "1", "FLASH LIGHT": "1", "ERT BOARD": "1", "E TAG": "0", "APAR": "13",
+    "APAR TERPASANG": "10", "APAR BACKUP": "2", "EXPIRED APAR": "2027-01-22", "UKURAN APAR": "4,5 KG", "MERK APAR": "KIDDE",
+    "TIPE APAR": "Dry Chemical (Powder ABC)", "KOTAK P3K": "1", "TIPE AKSES KONTROL": "TIDAK ADA",
+    "KETERANGAN": ""
+  }
+];
+
+// ============================================================================
+// 3. PASTE_URL_WEB_APP_KAMU_DI_SINI
+// ============================================================================
+let storeData = [];
+let filteredData = [];
+let currentPage = 1;
+let pageSize = 15;
+let charts = {};
+
+const STORAGE_KEY = "klg_datastore_jaksel_jaktim_v1";
+const GAS_URL_KEY = "klg_gas_webapp_url_v1";
+const GAS_AUTO_KEY = "klg_gas_autosync_v1";
+
+// TEMPELKAN URL WEB APP GAS KAMU DI BAWAH INI AGAR OTOMATIS TERHUBUNG UNTUK UMUM:
+const DEFAULT_GAS_URL = "PASTE_URL_WEB_APP_KAMU_DI_SINI";
+
+function getGasUrl() {
+  return localStorage.getItem(GAS_URL_KEY) || DEFAULT_GAS_URL;
+}
+
+document.addEventListener("DOMContentLoaded", async () => {
+  lucide.createIcons();
+  buildFormTabs();
+  loadFromLocalStorage();
+  updateSyncBadge();
+  populateFilterDropdowns();
+  applyFilters();
+
+  // Otomatis tarik data terbaru dari Google Sheet setiap kali halaman dibuka publik
+  if (getGasUrl() && getGasUrl().startsWith("http")) {
+    await pullFromGoogleSheet(true); // true = mode senyap (tanpa popup ganggu)
+  }
+});
+
+document.addEventListener("DOMContentLoaded", () => {
+  lucide.createIcons();
+  buildFormTabs();
+  loadFromLocalStorage();
+  updateSyncBadge();
+  populateFilterDropdowns();
+  applyFilters();
+});
+
+function loadFromLocalStorage() {
+  const saved = localStorage.getItem(STORAGE_KEY);
+  if (saved) {
+    try {
+      storeData = JSON.parse(saved);
+    } catch (e) {
+      storeData = [...INITIAL_SEED_DATA];
+    }
+  } else {
+    storeData = [...INITIAL_SEED_DATA];
+    saveToLocalStorage();
+  }
+}
+
+function saveToLocalStorage() {
+  localStorage.setItem(STORAGE_KEY, JSON.stringify(storeData));
+}
+
+// ============================================================================
+// 4. LOGIKA KEPATUHAN APAR & HELPER NUMERIK
+// ============================================================================
+function getAparStatus(expDateStr) {
+  if (!expDateStr || expDateStr.trim() === "" || expDateStr.toUpperCase() === "TIDAK ADA") {
+    return { code: "EMPTY", label: "Kosong / N/A", badge: "bg-slate-100 text-slate-600" };
+  }
+  const parsed = new Date(expDateStr);
+  if (isNaN(parsed.getTime())) {
+    return { code: "EMPTY", label: expDateStr, badge: "bg-slate-100 text-slate-600" };
+  }
+  const today = new Date();
+  const diffDays = Math.ceil((parsed - today) / (1000 * 60 * 60 * 24));
+  if (diffDays < 0) {
+    return { code: "EXPIRED", label: `${expDateStr} (Expired)`, badge: "bg-rose-100 text-rose-700 font-semibold" };
+  } else if (diffDays <= 90) {
+    return { code: "SOON", label: `${expDateStr} (${diffDays}h)`, badge: "bg-amber-100 text-amber-800 font-semibold" };
+  } else {
+    return { code: "VALID", label: expDateStr, badge: "bg-emerald-100 text-emerald-700" };
+  }
+}
+
+function toNum(val) {
+  if (!val) return 0;
+  const cleaned = String(val).replace(/,/g, ".").replace(/[^0-9.-]/g, "");
+  const n = parseFloat(cleaned);
+  return isNaN(n) ? 0 : n;
+}
+
+// ============================================================================
+// 5. FILTERING & RENDERING TABEL
+// ============================================================================
+function populateFilterDropdowns() {
+  const fillSelect = (id, key, defaultLabel) => {
+    const sel = document.getElementById(id);
+    const currentVal = sel.value;
+    const uniqueVals = [...new Set(storeData.map(d => (d[key] || "").trim()).filter(Boolean))].sort();
+    sel.innerHTML = `<option value="">${defaultLabel}</option>` +
+      uniqueVals.map(v => `<option value="${v}">${v}</option>`).join("");
+    sel.value = uniqueVals.includes(currentVal) ? currentVal : "";
+  };
+
+  fillSelect("filterBU", "BUSINESS UNIT", "Semua Business Unit");
+  fillSelect("filterBrand", "BRAND", "Semua Brand");
+  fillSelect("filterKota", "KABUPATEN / KOTA", "Semua Kabupaten/Kota");
+  fillSelect("filterSubCat", "SUB CATEGORY", "Semua Sub Category");
+}
+
+function applyFilters() {
+  const q = document.getElementById("filterSearch").value.toLowerCase().trim();
+  const bu = document.getElementById("filterBU").value;
+  const brand = document.getElementById("filterBrand").value;
+  const kota = document.getElementById("filterKota").value;
+  const subCat = document.getElementById("filterSubCat").value;
+  const aparStat = document.getElementById("filterAparStatus").value;
+
+  filteredData = storeData.filter(row => {
+    if (bu && row["BUSINESS UNIT"] !== bu) return false;
+    if (brand && row["BRAND"] !== brand) return false;
+    if (kota && row["KABUPATEN / KOTA"] !== kota) return false;
+    if (subCat && row["SUB CATEGORY"] !== subCat) return false;
+    if (aparStat) {
+      const st = getAparStatus(row["EXPIRED APAR"]).code;
+      if (st !== aparStat) return false;
+    }
+    if (q) {
+      const hay = [
+        row["KODE STORE"], row["BRAND+LOCATION NAME"], row["SITE NAME"],
+        row["BRAND"], row["STORE MANAGER"], row["LP SPV"], row["LP ARH"], row["KETERANGAN"]
+      ].join(" ").toLowerCase();
+      if (!hay.includes(q)) return false;
+    }
+    return true;
+  });
+
+  currentPage = 1;
+  updateKPIs();
+  updateCharts();
+  renderTable();
+}
+
+function resetFilters() {
+  document.getElementById("filterSearch").value = "";
+  document.getElementById("filterBU").value = "";
+  document.getElementById("filterBrand").value = "";
+  document.getElementById("filterKota").value = "";
+  document.getElementById("filterSubCat").value = "";
+  document.getElementById("filterAparStatus").value = "";
+  applyFilters();
+}
+
+function renderTable() {
+  const tbody = document.getElementById("storeTableBody");
+  const total = filteredData.length;
+  const totalPages = Math.max(1, Math.ceil(total / pageSize));
+  if (currentPage > totalPages) currentPage = totalPages;
+
+  const start = (currentPage - 1) * pageSize;
+  const slice = filteredData.slice(start, start + pageSize);
+
+  document.getElementById("showingCount").textContent = slice.length;
+  document.getElementById("totalCount").textContent = total;
+  document.getElementById("pageInfo").textContent = `Halaman ${currentPage} dari ${totalPages}`;
+  document.getElementById("btnPrev").disabled = currentPage <= 1;
+  document.getElementById("btnNext").disabled = currentPage >= totalPages;
+
+  if (slice.length === 0) {
+    tbody.innerHTML = `<tr><td colspan="11" class="py-10 text-center text-slate-400">Tidak ada data store yang sesuai dengan filter.</td></tr>`;
+    return;
+  }
+
+  tbody.innerHTML = slice.map(row => {
+    const apar = getAparStatus(row["EXPIRED APAR"]);
+    const isJaksel = (row["KABUPATEN / KOTA"] || "").includes("SELATAN");
+    const wilayahBadge = isJaksel ? "bg-sky-100 text-sky-800" : "bg-indigo-100 text-indigo-800";
+    const wilayahShort = isJaksel ? "JAKSEL" : "JAKTIM";
+
+    return `
+      <tr class="hover:bg-slate-50 transition">
+        <td class="py-2.5 px-3 font-bold text-slate-800 whitespace-nowrap">${row["KODE STORE"] || "-"}</td>
+        <td class="py-2.5 px-3 whitespace-nowrap">
+          <span class="px-2 py-0.5 rounded text-[11px] font-semibold bg-slate-800 text-white">${row["BRAND"] || "-"}</span>
+        </td>
+        <td class="py-2.5 px-3">
+          <div class="font-semibold text-slate-900">${row["BRAND+LOCATION NAME"] || "-"}</div>
+          <div class="text-[11px] text-slate-500 truncate max-w-xs">${row["SITE NAME"] || ""}</div>
+        </td>
+        <td class="py-2.5 px-3 whitespace-nowrap">
+          <span class="px-1.5 py-0.5 rounded text-[10px] font-bold ${wilayahBadge}">${wilayahShort}</span>
+          <span class="text-[11px] text-slate-600 ml-1">${row["SUB CATEGORY"] || ""}</span>
+        </td>
+        <td class="py-2.5 px-3 text-right font-mono text-slate-700">${toNum(row["AREA (m²)"]).toLocaleString("id-ID")}</td>
+        <td class="py-2.5 px-3">
+          <div class="text-slate-800 font-medium">${row["LP SPV"] || "-"}</div>
+          <div class="text-[10px] text-slate-400">ARH: ${row["LP ARH"] || "-"}</div>
+        </td>
+        <td class="py-2.5 px-3 text-center font-semibold text-slate-700">${row["JUMLAH MPP"] || "0"}</td>
+        <td class="py-2.5 px-3 text-center font-semibold text-slate-700">${row["CAMERA"] || "0"}</td>
+        <td class="py-2.5 px-3 whitespace-nowrap">
+          <span class="px-2 py-0.5 rounded-full text-[11px] ${apar.badge}">${apar.label}</span>
+        </td>
+        <td class="py-2.5 px-3 text-center">
+          <span class="px-2 py-0.5 rounded-full text-[10px] font-bold bg-emerald-100 text-emerald-800">${row["STATUS"] || "ACTIVE"}</span>
+        </td>
+        <td class="py-2.5 px-3 text-center whitespace-nowrap sticky right-0 bg-white">
+          <div class="inline-flex items-center gap-1">
+            <button onclick="openDetailModal('${row["KODE STORE"]}')" title="Lihat Detail 81 Kolom" class="p-1.5 text-sky-600 hover:bg-sky-50 rounded-lg transition">
+              <i data-lucide="eye" class="w-4 h-4"></i>
+            </button>
+            <button onclick="openFormModal('edit', '${row["KODE STORE"]}')" title="Edit Store" class="p-1.5 text-amber-600 hover:bg-amber-50 rounded-lg transition">
+              <i data-lucide="edit-2" class="w-4 h-4"></i>
+            </button>
+            <button onclick="deleteStore('${row["KODE STORE"]}')" title="Hapus Store" class="p-1.5 text-rose-600 hover:bg-rose-50 rounded-lg transition">
+              <i data-lucide="trash-2" class="w-4 h-4"></i>
+            </button>
+          </div>
+        </td>
+      </tr>
+    `;
+  }).join("");
+
+  lucide.createIcons();
+}
+
+function changePageSize() {
+  pageSize = parseInt(document.getElementById("pageSizeSelect").value, 10);
+  currentPage = 1;
+  renderTable();
+}
+function prevPage() { if (currentPage > 1) { currentPage--; renderTable(); } }
+function nextPage() { currentPage++; renderTable(); }
+
+// ============================================================================
+// 6. UPDATE KPI CARDS & GRAFIK REAL-TIME (CHART.JS)
+// ============================================================================
+function updateKPIs() {
+  const total = filteredData.length;
+  const jaksel = filteredData.filter(d => (d["KABUPATEN / KOTA"] || "").includes("SELATAN")).length;
+  const jaktim = filteredData.filter(d => (d["KABUPATEN / KOTA"] || "").includes("TIMUR")).length;
+
+  const totalArea = filteredData.reduce((acc, d) => acc + toNum(d["AREA (m²)"]), 0);
+  const avgArea = total ? Math.round(totalArea / total) : 0;
+
+  const totalMpp = filteredData.reduce((acc, d) => acc + toNum(d["JUMLAH MPP"]), 0);
+  const storeWithMpp = filteredData.filter(d => toNum(d["JUMLAH MPP"]) > 0).length;
+
+  const totalCam = filteredData.reduce((acc, d) => acc + toNum(d["CAMERA"]), 0);
+  const totalDvr = filteredData.reduce((acc, d) => acc + toNum(d["DVR HARDDISK"]), 0);
+
+  const totalApar = filteredData.reduce((acc, d) => acc + toNum(d["APAR"]), 0);
+  const aparTerpasang = filteredData.reduce((acc, d) => acc + toNum(d["APAR TERPASANG"]), 0);
+  const aparBackup = filteredData.reduce((acc, d) => acc + toNum(d["APAR BACKUP"]), 0);
+
+  let expCount = 0, soonCount = 0;
+  filteredData.forEach(d => {
+    const st = getAparStatus(d["EXPIRED APAR"]).code;
+    if (st === "EXPIRED") expCount++;
+    if (st === "SOON") soonCount++;
+  });
+
+  document.getElementById("kpiTotalStore").textContent = total;
+  document.getElementById("kpiAreaSub").textContent = `Jaksel: ${jaksel} | Jaktim: ${jaktim}`;
+  document.getElementById("kpiTotalArea").textContent = `${totalArea.toLocaleString("id-ID")} m²`;
+  document.getElementById("kpiAvgArea").textContent = `Rata-rata: ${avgArea.toLocaleString("id-ID")} m²`;
+  document.getElementById("kpiTotalMpp").textContent = totalMpp;
+  document.getElementById("kpiStoreWithMpp").textContent = `Store dengan MPP: ${storeWithMpp}`;
+  document.getElementById("kpiTotalCam").textContent = totalCam.toLocaleString("id-ID");
+  document.getElementById("kpiTotalDvr").textContent = `Total DVR/NVR: ${totalDvr}`;
+  document.getElementById("kpiTotalApar").textContent = totalApar;
+  document.getElementById("kpiAparSub").textContent = `Terpasang: ${aparTerpasang} | Backup: ${aparBackup}`;
+  document.getElementById("kpiAparExpired").textContent = expCount;
+  document.getElementById("kpiAparSoon").textContent = `Segera Expired (<90 hr): ${soonCount}`;
+}
+
+function updateCharts() {
+  const palette = ["#0284c7", "#4f46e5", "#10b981", "#f59e0b", "#e11d48", "#8b5cf6", "#06b6d4", "#64748b", "#ec4899", "#14b8a6"];
+
+  // 1. Brand Chart
+  const brandCounts = {};
+  filteredData.forEach(d => {
+    const b = d["BRAND"] || "LAINNYA";
+    brandCounts[b] = (brandCounts[b] || 0) + 1;
+  });
+  const sortedBrands = Object.entries(brandCounts).sort((a, b) => b[1] - a[1]);
+
+  renderChart("chartBrand", "bar", {
+    labels: sortedBrands.map(x => x[0]),
+    datasets: [{
+      label: "Jumlah Store",
+      data: sortedBrands.map(x => x[1]),
+      backgroundColor: "#0284c7",
+      borderRadius: 4
+    }]
+  }, { indexAxis: "y", plugins: { legend: { display: false } } });
+
+  // 2. Wilayah & Sub Category Chart
+  const regCounts = {};
+  filteredData.forEach(d => {
+    const k = (d["KABUPATEN / KOTA"] || "").replace("KOTA ", "");
+    const s = d["SUB CATEGORY"] || "";
+    const lbl = `${k} (${s})`;
+    regCounts[lbl] = (regCounts[lbl] || 0) + 1;
+  });
+
+  renderChart("chartRegion", "doughnut", {
+    labels: Object.keys(regCounts),
+    datasets: [{
+      data: Object.values(regCounts),
+      backgroundColor: palette
+    }]
+  }, { plugins: { legend: { position: "bottom", labels: { boxWidth: 10, font: { size: 10 } } } } });
+
+  // 3. Business Unit Chart
+  const buCounts = {};
+  filteredData.forEach(d => {
+    const bu = (d["BUSINESS UNIT"] || "N/A").replace("PT. ", "").replace(", Tbk", "");
+    buCounts[bu] = (buCounts[bu] || 0) + 1;
+  });
+
+  renderChart("chartBU", "bar", {
+    labels: Object.keys(buCounts),
+    datasets: [{
+      label: "Store",
+      data: Object.values(buCounts),
+      backgroundColor: "#4f46e5",
+      borderRadius: 4
+    }]
+  }, { plugins: { legend: { display: false } }, scales: { x: { ticks: { font: { size: 9 } } } } });
+
+  // 4. APAR Status Chart
+  const aparGroups = { Valid: 0, "Segera Expired (<90h)": 0, Expired: 0, "Data Kosong": 0 };
+  filteredData.forEach(d => {
+    const c = getAparStatus(d["EXPIRED APAR"]).code;
+    if (c === "VALID") aparGroups.Valid++;
+    else if (c === "SOON") aparGroups["Segera Expired (<90h)"]++;
+    else if (c === "EXPIRED") aparGroups.Expired++;
+    else aparGroups["Data Kosong"]++;
+  });
+
+  renderChart("chartApar", "pie", {
+    labels: Object.keys(aparGroups),
+    datasets: [{
+      data: Object.values(aparGroups),
+      backgroundColor: ["#10b981", "#f59e0b", "#e11d48", "#94a3b8"]
+    }]
+  }, { plugins: { legend: { position: "bottom", labels: { boxWidth: 10, font: { size: 10 } } } } });
+}
+
+function renderChart(canvasId, type, data, extraOptions = {}) {
+  const ctx = document.getElementById(canvasId).getContext("2d");
+  if (charts[canvasId]) {
+    charts[canvasId].destroy();
+  }
+  charts[canvasId] = new Chart(ctx, {
+    type,
+    data,
+    options: {
+      responsive: true,
+      maintainAspectRatio: false,
+      ...extraOptions
+    }
+  });
+}
+
+// ============================================================================
+// 7. MODAL DETAIL & FORM CRUD (81 KOLOM)
+// ============================================================================
+function openDetailModal(kodeStore) {
+  const row = storeData.find(d => d["KODE STORE"] === kodeStore);
+  if (!row) return;
+
+  document.getElementById("detKodeBadge").textContent = row["KODE STORE"];
+  document.getElementById("detTitle").textContent = row["BRAND+LOCATION NAME"] || row["SITE NAME"];
+  document.getElementById("detSubtitle").textContent = `${row["BUSINESS UNIT"]} • ${row["KABUPATEN / KOTA"]}`;
+
+  const mapBtn = document.getElementById("detMapLink");
+  if (row["LINK GOOGLE MAP"] && row["LINK GOOGLE MAP"].startsWith("http")) {
+    mapBtn.href = row["LINK GOOGLE MAP"];
+    mapBtn.classList.remove("hidden");
+  } else {
+    mapBtn.classList.add("hidden");
+  }
+
+  document.getElementById("detEditBtn").onclick = () => {
+    closeModal("detailModal");
+    openFormModal("edit", kodeStore);
+  };
+
+  const container = document.getElementById("detailContent");
+  container.innerHTML = COLUMN_GROUPS.map(group => `
+    <div class="border border-slate-200 rounded-xl overflow-hidden">
+      <div class="bg-slate-100 px-4 py-2 font-bold text-slate-700 border-b border-slate-200">${group.title}</div>
+      <div class="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-x-6 gap-y-2.5 p-4">
+        ${group.cols.map(col => `
+          <div class="border-b border-slate-100 pb-1">
+            <div class="text-[10px] font-semibold text-slate-400 uppercase">${col}</div>
+            <div class="text-slate-800 font-medium break-words">${row[col] || "<span class='text-slate-300'>-</span>"}</div>
+          </div>
+        `).join("")}
+      </div>
+    </div>
+  `).join("");
+
+  showModal("detailModal");
+}
+
+function buildFormTabs() {
+  const container = document.getElementById("formTabsContainer");
+  container.innerHTML = COLUMN_GROUPS.map((group, idx) => `
+    <div class="form-tab-panel ${idx === 0 ? "" : "hidden"} grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-4" data-tab="${idx}">
+      ${group.cols.map(col => {
+        const isRequired = col === "KODE STORE" ? "required" : "";
+        const isTextarea = col === "KETERANGAN";
+        const isDate = ["OPEN DATE", "RELAYOUT", "RELOKASI", "EXPIRED APAR"].includes(col);
+        const inputType = isDate ? "date" : "text";
+        return `
+          <div class="${isTextarea ? "sm:col-span-2 md:col-span-3" : ""}">
+            <label class="block text-[11px] font-semibold text-slate-600 mb-1">${col} ${isRequired ? '<span class="text-rose-500">*</span>' : ''}</label>
+            ${isTextarea
+              ? `<textarea name="${col}" rows="2" class="w-full px-3 py-1.5 border border-slate-300 rounded-lg focus:ring-2 focus:ring-sky-500 outline-none"></textarea>`
+              : `<input type="${inputType}" name="${col}" ${isRequired} class="w-full px-3 py-1.5 border border-slate-300 rounded-lg focus:ring-2 focus:ring-sky-500 outline-none" />`
+            }
+          </div>
+        `;
+      }).join("")}
+    </div>
+  `).join("");
+}
+
+function switchFormTab(tabIdx) {
+  document.querySelectorAll(".tab-btn").forEach((btn, i) => {
+    btn.classList.toggle("active", i === tabIdx);
+  });
+  document.querySelectorAll(".form-tab-panel").forEach((panel, i) => {
+    panel.classList.toggle("hidden", i !== tabIdx);
+  });
+}
+
+function openFormModal(mode, kodeStore = "") {
+  const form = document.getElementById("storeForm");
+  form.reset();
+  switchFormTab(0);
+  document.getElementById("formMode").value = mode;
+  document.getElementById("originalKodeStore").value = kodeStore;
+
+  if (mode === "edit") {
+    document.getElementById("formModalTitle").textContent = `Edit Data Store: ${kodeStore}`;
+    const row = storeData.find(d => d["KODE STORE"] === kodeStore);
+    if (row) {
+      ALL_COLUMNS.forEach(col => {
+        const el = form.elements[col];
+        if (el) el.value = row[col] || "";
+      });
+    }
+  } else {
+    document.getElementById("formModalTitle").textContent = "Tambah Data Store Baru";
+    form.elements["STATUS"].value = "ACTIVE";
+    form.elements["PROVINSI"].value = "DKI JAKARTA";
+    form.elements["PULAU"].value = "JAWA";
+  }
+
+  showModal("formModal");
+}
+
+async function handleFormSubmit(e) {
+  e.preventDefault();
+  const form = e.target;
+  const mode = document.getElementById("formMode").value;
+  const origKode = document.getElementById("originalKodeStore").value;
+
+  const newRecord = {};
+  ALL_COLUMNS.forEach(col => {
+    const el = form.elements[col];
+    newRecord[col] = el ? el.value.trim() : "";
+  });
+
+  if (!newRecord["KODE STORE"]) {
+    showToast("KODE STORE wajib diisi!", "error");
+    return;
+  }
+
+  if (mode === "create") {
+    if (storeData.some(d => d["KODE STORE"] === newRecord["KODE STORE"])) {
+      showToast("KODE STORE sudah terdaftar!", "error");
+      return;
+    }
+    storeData.unshift(newRecord);
+    saveToLocalStorage();
+    populateFilterDropdowns();
+    applyFilters();
+    closeModal("formModal");
+    showToast(`Store ${newRecord["KODE STORE"]} berhasil ditambahkan.`, "success");
+    await syncCrudToGas("create", { record: newRecord });
+  } else {
+    const idx = storeData.findIndex(d => d["KODE STORE"] === origKode);
+    if (idx !== -1) {
+      storeData[idx] = newRecord;
+      saveToLocalStorage();
+      populateFilterDropdowns();
+      applyFilters();
+      closeModal("formModal");
+      showToast(`Store ${newRecord["KODE STORE"]} berhasil diperbarui.`, "success");
+      await syncCrudToGas("update", { originalKode: origKode, record: newRecord });
+    }
+  }
+}
+
+async function deleteStore(kodeStore) {
+  if (!confirm(`Yakin ingin menghapus data store "${kodeStore}"? Tindakan ini juga akan menghapus baris terkait di Google Sheet jika sinkronisasi aktif.`)) {
+    return;
+  }
+  storeData = storeData.filter(d => d["KODE STORE"] !== kodeStore);
+  saveToLocalStorage();
+  populateFilterDropdowns();
+  applyFilters();
+  showToast(`Store ${kodeStore} telah dihapus.`, "success");
+  await syncCrudToGas("delete", { kodeStore });
+}
+
+// ============================================================================
+// 8. IMPORT & EXPORT CSV
+// ============================================================================
+function handleCsvUpload(event) {
+  const file = event.target.files[0];
+  if (!file) return;
+
+  Papa.parse(file, {
+    header: true,
+    skipEmptyLines: true,
+    complete: function(results) {
+      const imported = results.data.map(raw => {
+        const cleanRow = {};
+        ALL_COLUMNS.forEach(col => {
+          cleanRow[col] = raw[col] !== undefined && raw[col] !== null ? String(raw[col]).trim() : "";
+        });
+        return cleanRow;
+      }).filter(r => r["KODE STORE"]);
+
+      if (imported.length === 0) {
+        showToast("File CSV kosong atau header tidak sesuai.", "error");
+        return;
+      }
+
+      storeData = imported;
+      saveToLocalStorage();
+      populateFilterDropdowns();
+      applyFilters();
+      showToast(`Berhasil mengimpor ${imported.length} data store dari CSV!`, "success");
+    }
+  });
+  event.target.value = "";
+}
+
+function exportToCsv() {
+  const csv = Papa.unparse(filteredData, { columns: ALL_COLUMNS });
+  const blob = new Blob(["\uFEFF" + csv], { type: "text/csv;charset=utf-8;" });
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement("a");
+  a.href = url;
+  a.download = `Data_Store_Jaksel_Jaktim_${new Date().toISOString().slice(0, 10)}.csv`;
+  a.click();
+  URL.revokeObjectURL(url);
+}
+
+// ============================================================================
+// 9. INTEGRASI 2 ARAH KE GOOGLE SPREADSHEET (GOOGLE APPS SCRIPT)
+// ============================================================================
+function openGasModal() {
+  document.getElementById("gasUrlInput").value = getGasUrl();
+  document.getElementById("autoSyncCheckbox").checked = localStorage.getItem(GAS_AUTO_KEY) !== "false";
+  showModal("gasModal");
+}
+
+function saveGasConfig() {
+  const url = document.getElementById("gasUrlInput").value.trim();
+  const auto = document.getElementById("autoSyncCheckbox").checked;
+  localStorage.setItem(GAS_URL_KEY, url);
+  localStorage.setItem(GAS_AUTO_KEY, auto ? "true" : "false");
+  updateSyncBadge();
+  closeModal("gasModal");
+  if (url) {
+    showToast("URL Web App tersimpan. Menarik data dari Google Sheet...", "info");
+    pullFromGoogleSheet();
+  }
+}
+
+function updateSyncBadge() {
+  const url = getGasUrl();
+  const dot = document.getElementById("syncDot");
+  const text = document.getElementById("syncText");
+  if (url && url.startsWith("http")) {
+    dot.className = "w-2 h-2 rounded-full bg-emerald-400 animate-pulse";
+    text.textContent = "Terhubung Google Sheet (Online)";
+  } else {
+    dot.className = "w-2 h-2 rounded-full bg-amber-400";
+    text.textContent = "Mode Lokal (Belum Terhubung GAS)";
+  }
+}
+
+async function pullFromGoogleSheet(silent = false) {
+  const url = getGasUrl();
+  if (!url || !url.startsWith("http")) {
+    if (!silent) openGasModal();
+    return;
+  }
+  if (!silent) showToast("Menarik data terbaru dari Google Spreadsheet...", "info");
+  try {
+    const res = await fetch(url);
+    const json = await res.json();
+    if (json.status === "success" && Array.isArray(json.data)) {
+      if (json.data.length > 0) {
+        storeData = json.data.map(raw => {
+          const cleanRow = {};
+          ALL_COLUMNS.forEach(col => {
+            cleanRow[col] = raw[col] !== undefined && raw[col] !== null ? String(raw[col]).trim() : "";
+          });
+          return cleanRow;
+        });
+        saveToLocalStorage();
+        populateFilterDropdowns();
+        applyFilters();
+      }
+      if (!silent) showToast(`Sinkronisasi Pull berhasil (${storeData.length} store dimuat).`, "success");
+    } else {
+      throw new Error(json.message || "Format respon GAS tidak valid.");
+    }
+  } catch (err) {
+    if (!silent) showToast("Gagal Pull dari Google Sheet: " + err.message, "error");
+  }
+}
+
+async function pushAllToGoogleSheet() {
+  const url = getGasUrl();
+  if (!url || !url.startsWith("http")) {
+    openGasModal();
+    return;
+  }
+  if (!confirm(`Kirim seluruh ${storeData.length} baris data lokal ini untuk menimpa isi Google Spreadsheet?`)) return;
+
+  showToast("Mengirim seluruh data ke Google Spreadsheet...", "info");
+  try {
+    const res = await fetch(url, {
+      method: "POST",
+      headers: { "Content-Type": "text/plain;charset=utf-8" },
+      body: JSON.stringify({ action: "syncAll", records: storeData })
+    });
+    const json = await res.json();
+    if (json.status === "success") {
+      showToast(json.message, "success");
+    } else {
+      throw new Error(json.message);
+    }
+  } catch (err) {
+    showToast("Gagal Push All: " + err.message, "error");
+  }
+}
+
+async function syncCrudToGas(action, payloadObj) {
+  const url = getGasUrl();
+  const auto = localStorage.getItem(GAS_AUTO_KEY) !== "false";
+  if (!url || !url.startsWith("http") || !auto) return;
+
+  try {
+    const res = await fetch(url, {
+      method: "POST",
+      headers: { "Content-Type": "text/plain;charset=utf-8" },
+      body: JSON.stringify({ action, ...payloadObj })
+    });
+    const json = await res.json();
+    if (json.status === "success") {
+      showToast("Tersinkron ke Google Sheet: " + json.message, "success");
+    } else {
+      showToast("Warning GAS: " + json.message, "error");
+    }
+  } catch (err) {
+    showToast("Perubahan tersimpan lokal, namun gagal sync ke GAS: " + err.message, "error");
+  }
+}
+
+function saveGasConfig() {
+  const url = document.getElementById("gasUrlInput").value.trim();
+  const auto = document.getElementById("autoSyncCheckbox").checked;
+  localStorage.setItem(GAS_URL_KEY, url);
+  localStorage.setItem(GAS_AUTO_KEY, auto ? "true" : "false");
+  updateSyncBadge();
+  closeModal("gasModal");
+  if (url) {
+    showToast("URL Web App tersimpan. Mencoba menarik data dari Google Sheet...", "info");
+    pullFromGoogleSheet();
+  }
+}
+
+function updateSyncBadge() {
+  const url = localStorage.getItem(GAS_URL_KEY);
+  const dot = document.getElementById("syncDot");
+  const text = document.getElementById("syncText");
+  if (url) {
+    dot.className = "w-2 h-2 rounded-full bg-emerald-400 animate-pulse";
+    text.textContent = "Terhubung Google Sheet";
+  } else {
+    dot.className = "w-2 h-2 rounded-full bg-amber-400";
+    text.textContent = "Mode Lokal (Belum Terhubung GAS)";
+  }
+}
+
+async function pullFromGoogleSheet() {
+  const url = localStorage.getItem(GAS_URL_KEY);
+  if (!url) {
+    openGasModal();
+    return;
+  }
+  showToast("Menarik data terbaru dari Google Spreadsheet...", "info");
+  try {
+    const res = await fetch(url);
+    const json = await res.json();
+    if (json.status === "success" && Array.isArray(json.data)) {
+      storeData = json.data.map(raw => {
+        const cleanRow = {};
+        ALL_COLUMNS.forEach(col => {
+          cleanRow[col] = raw[col] !== undefined && raw[col] !== null ? String(raw[col]).trim() : "";
+        });
+        return cleanRow;
+      });
+      saveToLocalStorage();
+      populateFilterDropdowns();
+      applyFilters();
+      showToast(`Sinkronisasi Pull berhasil (${storeData.length} store dimuat).`, "success");
+    } else {
+      throw new Error(json.message || "Format respon GAS tidak valid.");
+    }
+  } catch (err) {
+    showToast("Gagal Pull dari Google Sheet: " + err.message, "error");
+  }
+}
+
+async function pushAllToGoogleSheet() {
+  const url = localStorage.getItem(GAS_URL_KEY);
+  if (!url) {
+    openGasModal();
+    return;
+  }
+  if (!confirm(`Kirim seluruh ${storeData.length} baris data lokal ini untuk menimpa isi Google Spreadsheet?`)) return;
+
+  showToast("Mengirim seluruh data ke Google Spreadsheet...", "info");
+  try {
+    const res = await fetch(url, {
+      method: "POST",
+      body: JSON.stringify({ action: "syncAll", records: storeData })
+    });
+    const json = await res.json();
+    if (json.status === "success") {
+      showToast(json.message, "success");
+    } else {
+      throw new Error(json.message);
+    }
+  } catch (err) {
+    showToast("Gagal Push All: " + err.message, "error");
+  }
+}
+
+async function syncCrudToGas(action, payloadObj) {
+  const url = localStorage.getItem(GAS_URL_KEY);
+  const auto = localStorage.getItem(GAS_AUTO_KEY) !== "false";
+  if (!url || !auto) return;
+
+  try {
+    const res = await fetch(url, {
+      method: "POST",
+      body: JSON.stringify({ action, ...payloadObj })
+    });
+    const json = await res.json();
+    if (json.status === "success") {
+      showToast("Tersinkron ke Google Sheet: " + json.message, "success");
+    } else {
+      showToast("Warning GAS: " + json.message, "error");
+    }
+  } catch (err) {
+    showToast("Perubahan tersimpan lokal, namun gagal sync ke GAS: " + err.message, "error");
+  }
+}
+
+// ============================================================================
+// 10. MODAL & TOAST UTILITIES
+// ============================================================================
+function showModal(id) {
+  const el = document.getElementById(id);
+  el.classList.remove("hidden");
+  el.classList.add("flex");
+}
+function closeModal(id) {
+  const el = document.getElementById(id);
+  el.classList.add("hidden");
+  el.classList.remove("flex");
+}
+function showToast(msg, type = "info") {
+  const toast = document.getElementById("toast");
+  const icon = document.getElementById("toastIcon");
+  const text = document.getElementById("toastMessage");
+
+  const colors = {
+    success: "bg-emerald-900 border-emerald-600",
+    error: "bg-rose-900 border-rose-600",
+    info: "bg-slate-900 border-sky-600"
+  };
+  toast.className = `fixed bottom-5 right-5 z-50 flex items-center gap-2.5 px-4 py-3 rounded-xl shadow-xl text-xs font-medium text-white border ${colors[type] || colors.info}`;
+  icon.textContent = type === "success" ? "✔" : type === "error" ? "✖" : "ℹ";
+  text.textContent = msg;
+
+  toast.classList.remove("hidden");
+  clearTimeout(window._toastTimer);
+  window._toastTimer = setTimeout(() => toast.classList.add("hidden"), 4200);
+}
+</script>
+</body>
+</html>
+
